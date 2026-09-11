@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wan2GP Video Generator</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #172033; }
+    label { display: block; margin: 1rem 0 .35rem; font-weight: 600; }
+    textarea, input, select, button { box-sizing: border-box; width: 100%; padding: .7rem; font: inherit; }
+    textarea { min-height: 7rem; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    button { margin-top: 1.25rem; cursor: pointer; background: #1769e0; border: 0; color: white; font-weight: 700; }
+    button:disabled { background: #8b96a8; cursor: wait; }
+    #status { margin-top: 1rem; min-height: 2rem; white-space: pre-wrap; }
+    video { display: block; width: 100%; margin-top: 1.5rem; background: #111; }
+    #download { display: none; margin-top: .8rem; color: #1769e0; font-weight: 700; }
+    .error { color: #b42318; }
+    .muted { color: #667085; }
+  </style>
+</head>
+<body>
+  <h1>Wan2GP Video Generator</h1>
+  <p class="muted">This prototype runs one real Wan2GP generation at a time.</p>
+  <p id="gpu" class="muted">Checking GPU...</p>
+  <form id="form">
+    <label for="prompt">Prompt</label>
+    <textarea id="prompt" required>A small golden bird flying over a quiet lake at sunrise</textarea>
+    <label for="model">Model</label>
+    <select id="model" required><option>Loading models...</option></select>
+    <div class="grid">
+      <div><label for="frames">Frames</label><input id="frames" type="number" min="1" max="9999" value="33"></div>
+      <div><label for="steps">Steps</label><input id="steps" type="number" min="1" max="100" value="20"></div>
+      <div><label for="seed">Seed</label><input id="seed" type="number" min="-1" value="42"></div>
+    </div>
+    <button id="generate" type="submit">Generate Video</button>
+  </form>
+  <div id="status" class="muted"></div>
+  <video id="video" controls hidden></video>
+  <a id="download" download="generated.mp4">Download video</a>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let jobId = null;
+    async function loadModels() {
+      const health = await fetch('/api/health').then((r) => r.json());
+      $('gpu').textContent = `CUDA: ${health.gpu.cuda_available} | GPU: ${health.gpu.gpu_name || 'none'} | PyTorch: ${health.gpu.pytorch_version} | CUDA runtime: ${health.gpu.cuda_version || 'none'}`;
+      const response = await fetch('/api/models');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Model loading failed');
+      $('model').replaceChildren(...data.models.map((model) => new Option(model.name, model.model_type)));
+      if (!data.models.length) throw new Error('No available video models found');
+    }
+    async function poll() {
+      const response = await fetch(`/api/generate/${jobId}`);
+      const job = await response.json();
+      if (!response.ok) throw new Error(job.detail || 'Status request failed');
+      $('status').textContent = `${job.status}: ${job.status_text || ''}${job.progress == null ? '' : ` (${job.progress}%)`}`;
+      if (job.phase) $('status').textContent += `\nPhase: ${job.phase}`;
+      if (job.status === 'FAILED') throw new Error(job.error || 'Generation failed');
+      if (job.status !== 'COMPLETED') return setTimeout(poll, 1000);
+      $('video').src = `/api/video/${jobId}`;
+      $('video').hidden = false;
+      $('download').href = `/api/video/${jobId}`;
+      $('download').style.display = 'block';
+      $('generate').disabled = false;
+    }
+    $('form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      $('generate').disabled = true;
+      $('video').hidden = true;
+      $('download').style.display = 'none';
+      $('status').className = 'muted';
+      $('status').textContent = 'Submitting real Wan2GP generation...';
+      try {
+        const response = await fetch('/api/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ prompt: $('prompt').value, model: $('model').value, frames: Number($('frames').value), steps: Number($('steps').value), seed: Number($('seed').value) }) });
+        const job = await response.json();
+        if (!response.ok) throw new Error(job.detail || 'Generation request failed');
+        jobId = job.id;
+        await poll();
+      } catch (error) {
+        $('status').className = 'error';
+        $('status').textContent = error.message;
+        $('generate').disabled = false;
+      }
+    });
+    loadModels().catch((error) => { $('status').className = 'error'; $('status').textContent = error.message; });
+  </script>
+</body>
+</html>

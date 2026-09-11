@@ -614,6 +614,50 @@ For detailed installation instructions for different GPU generations:
 
 ## 📚 Documentation
 
+### Minimal GPU video prototype
+
+For the temporary real-generation validation path, use [docs/GPU_PROTOTYPE.md](docs/GPU_PROTOTYPE.md). It runs a single-process FastAPI app with an in-memory job and the existing `shared.api.WanGPSession`; it does not use the production authentication, database, or queue architecture.
+
+From the repository root after installing the WanGP and prototype dependencies:
+
+```bash
+python -m uvicorn gpu_prototype.main:app --host 0.0.0.0 --port 8000
+```
+
+Open the forwarded port in a browser. The app reports CUDA diagnostics, lists available WanGP video models, submits real generations, and serves completed files from `outputs/<job_id>/generated.mp4`.
+
+### Platform generation backend
+
+The platform backend integrates with the repository's existing Wan2GP API through `shared.api.init()` and `WanGPSession`. See [docs/WAN2GP_INTEGRATION.md](docs/WAN2GP_INTEGRATION.md) for the lifecycle, supported parameters, queue, storage, and limitations.
+
+Start the backend from the backend directory:
+
+```powershell
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The MVP uses one backend process and one database-backed generation worker for one GPU. The worker starts with the FastAPI application and owns one reusable Wan2GP session. Configure `WAN2GP_ROOT`, `WAN2GP_CONFIG_PATH`, `DATABASE_URL`, `JWT_SECRET_KEY`, and `STORAGE_PATH` as needed.
+
+Start the frontend separately:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+After login, open `/dashboard/videos` to submit a generation and monitor its real queue status. Completed videos are stored under `<STORAGE_PATH>/videos/<user_id>/<job_id>/`.
+
+Initialize or migrate the database with Alembic after installing backend requirements:
+
+```powershell
+cd backend
+alembic upgrade head
+```
+
+Actual Wan2GP generation requires the configured model files, FFmpeg, compatible Wan2GP dependencies, and an appropriate GPU. The project does not claim a successful real GPU generation unless one has been executed.
+
 - **[Changelog](docs/CHANGELOG.md)** - Latest updates and version history
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 

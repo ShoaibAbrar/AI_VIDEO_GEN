@@ -48,8 +48,56 @@ dlss5/
 /settings/
 
 wgp_config.json
+
+# ============================================================================
+# Backend (Python)
+# ============================================================================
+backend/.venv/
+backend/venv/
+backend/.env
+backend/.env.local
+backend/*.db
+backend/test.db
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/dist/
+backend/build/
+backend/*.egg-info/
+backend/.coverage
+backend/htmlcov/
+
+# ============================================================================
+# Frontend (Node.js)
+# ============================================================================
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/coverage/
+frontend/*.local
+frontend/.vscode/
+frontend/.idea/
+
+# ============================================================================
+# IDE & OS
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.env
+.env.local
 plugins_local.json
 /plugins/wan2gp-*/
 /plugins/wangp-*/
 loras_url_cache.json
 loras_url_cache_v2.json
+
+# Keep the GPU prototype browser UI
+!gpu_prototype/static/
+!gpu_prototype/static/index.html
