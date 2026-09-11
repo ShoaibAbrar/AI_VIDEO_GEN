@@ -1,6 +1,6 @@
-# Minimal GPU Prototype
+# Minimal GPU Video Generation Prototype
 
-This prototype is intentionally separate from the production platform code. It provides one browser page, one in-memory job, one generation at a time, and the existing Wan2GP programmatic API.
+This prototype is intentionally separate from the production platform code. It provides one browser page, one in-memory job, one generation at a time, and uses the real in-process Wan2GP programmatic API.
 
 ```text
 Browser
@@ -8,82 +8,104 @@ Browser
     -> shared.api.init()
       -> WanGPSession.submit_task()
         -> actual Wan2GP generation
-          -> GPU
+          -> GPU (Tesla T4)
             -> outputs/<job_id>/generated.mp4
 ```
 
-## Supported environment
+> [!NOTE]
+> **REAL GPU GENERATION NOT VERIFIED** locally until executed on an actual Lightning AI GPU Studio.
 
-Use the combinations documented by the existing WanGP repository:
+---
 
-- RTX 20xx through RTX 50xx: Python 3.11.14, PyTorch 2.10.0, CUDA 13.0/13.1.
-- GTX 10xx: Python 3.10.9, PyTorch 2.7.1, CUDA 12.8.
+## Lightning AI Tesla T4 Environment
 
-The prototype does not invent a VRAM minimum. Start with the actual selected model's profile and resolution. The repository advertises some configurations from 6 GB VRAM, but requirements vary by model and profile.
+The target environment on Lightning AI Studio is:
+* **OS**: Linux
+* **GPU**: Tesla T4 (15,360 MB VRAM)
+* **Python**: 3.12.11 (Lightning default environment)
+* **PyTorch**: 2.8.0+cu128
 
-## Lightning AI setup
+Do **NOT** attempt to create a custom Conda environment inside Lightning Studio. Use the default pre-configured PyTorch CUDA environment.
 
-The following uses the RTX 20xx-50xx environment. For GTX 10xx, use the Python 3.10/PyTorch 2.7.1/CUDA 12.8 commands in [INSTALLATION.md](INSTALLATION.md).
+---
+
+## Step-by-Step Lightning Setup & Execution
+
+### Step 1: Clone Repository & Verify Environment
+Start in your workspace folder (`~/AI_VIDEO_GEN` or `Wan2GP`):
 
 ```bash
-conda create -n wangp-prototype python=3.11.14
-conda activate wangp-prototype
+cd ~/AI_VIDEO_GEN
 nvidia-smi
-python --version
-pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu130
-git clone <YOUR_REPOSITORY_URL>
-cd Wan2GP
-pip install -r requirements.txt
-pip install -r gpu_prototype/requirements.txt
-python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none'); print('count:', torch.cuda.device_count()); print('PyTorch:', torch.__version__); print('CUDA runtime:', torch.version.cuda)"
+python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0)); print('PyTorch:', torch.__version__); print('CUDA runtime:', torch.version.cuda)"
 ```
 
-The selected WanGP model definition downloads its configured checkpoint on first use when the machine has network access. The initial UI selects the first available video model reported by WanGP. For a predictable first test, select `t2v_1.3B` when it is available; its repository definition is [defaults/t2v_1.3B.json](../defaults/t2v_1.3B.json).
+### Step 2: Install Repository Dependencies
+Install repository requirements and prototype-specific requirements:
 
-## Run
+```bash
+pip install -r requirements.txt
+pip install -r gpu_prototype/requirements.txt
+```
 
-From the repository root:
+### Step 3: Run Model Setup
+Wan2GP requires both the main model weights (`t2v_1.3B`) and the UMT5-XXL text encoder checkpoint (`models_t5_umt5-xxl-enc-quanto_int8.safetensors`).
+
+Run the automated setup script:
+
+```bash
+python scripts/download_model.py t2v_1.3B
+```
+
+This will download:
+* `ckpts/wan2.1_text2video_1.3B_mbf16.safetensors`
+* `ckpts/umt5-xxl/models_t5_umt5-xxl-enc-quanto_int8.safetensors`
+
+### Step 4: Run Prototype Server
+Start FastAPI server with uvicorn on port `8000`:
 
 ```bash
 python -m uvicorn gpu_prototype.main:app --host 0.0.0.0 --port 8000
 ```
 
-Open the Lightning AI forwarded port for `8000` in a browser. The backend serves the minimal UI and API from the same process. No separate worker command is needed.
+### Step 5: Open Browser & Expose Port 8000
+Expose/forward port `8000` in your Lightning AI Studio UI and open the URL in your browser.
 
-The prototype endpoints are:
+---
 
-- `GET /api/health`
-- `GET /api/models`
-- `POST /api/generate`
-- `GET /api/generate/{job_id}`
-- `GET /api/video/{job_id}`
+## First Generation Settings
 
-Generated files are copied to:
+Use the following low-memory settings tailored for Tesla T4:
 
-```text
-outputs/<job_id>/generated.mp4
-```
+* **Prompt**: `A small golden bird flying over a quiet lake at sunrise`
+* **Model**: `t2v_1.3B`
+* **Frames**: `33` (~2 seconds of video at 16 fps)
+* **Steps**: `20`
+* **Seed**: `42`
 
-## First test
+Click **Generate Video**. Watch the real status and progress updates as WanGP runs.
 
-Use:
+Upon completion:
+* Output video will be saved at `outputs/<job_id>/generated.mp4`.
+* The browser video player will automatically display the generated video.
+* Click **Download video** to save the file.
 
-```text
-A small golden bird flying over a quiet lake at sunrise
-```
+---
 
-Use a short frame count such as `33`, the model's default-compatible step count shown by the UI, and seed `42`.
+## Prototype API Endpoints
 
-Success means the job reaches `COMPLETED`, `outputs/<job_id>/generated.mp4` exists, and the browser video player can play the returned file. The backend logs the actual WanGP/model errors if loading or generation fails.
+* `GET /api/health`: Returns PyTorch, CUDA, and GPU status diagnostics.
+* `GET /api/models`: Returns list of available models and diagnostic info for unavailable models.
+* `POST /api/generate`: Submits a real Wan2GP generation task.
+* `GET /api/generate/{job_id}`: Polls task status and progress (0-100%).
+* `GET /api/video/{job_id}`: Streams the generated MP4 file.
+
+---
 
 ## Troubleshooting
 
-- `CUDA/GPU unavailable`: check `nvidia-smi`, `torch.cuda.is_available()`, and that the PyTorch wheel matches the CUDA setup.
-- `Model loading failed`: confirm the model is available, the checkpoint download completed, and the WanGP root dependencies were installed.
-- Out-of-memory errors: use a smaller supported model/profile, shorter video, or lower resolution through WanGP's model configuration. Do not increase jobs; this prototype already allows only one generation.
-- Missing output: inspect the backend log and `outputs/`; the prototype fails visibly rather than creating a placeholder file.
-- Port access: expose/forward port `8000` in the Lightning workspace and use the forwarded URL, not `localhost` from your own computer.
-
-## Verification boundary
-
-Local checks can verify imports, API validation, and frontend delivery. They cannot prove generation. A real GPU video-generation pass is successful only when WanGP produces the MP4 and the browser plays it.
+* **CUDA/GPU unavailable**: Confirm `nvidia-smi` works and `torch.cuda.is_available()` returns `True`.
+* **Model unavailable in UI**: Run `python scripts/download_model.py t2v_1.3B` to download missing main checkpoint or UMT5 text encoder files.
+* **FP16 Warning**: On Tesla T4 (compute capability 7.5 < 8.0), WanGP automatically logs:
+  `Switching to FP16 models when possible as GPU architecture doesn't support optimed BF16 Kernels`
+  This is normal and expected behavior.

@@ -76,19 +76,64 @@ def get_session():
         return _session
 
 
-def model_records() -> list[dict[str, Any]]:
-    session = get_session()
-    records = session.list_model_metadata(include_availability=True, main_output="video")
-    return [
-        {
-            "model_type": record.get("model_type"),
-            "name": record.get("name", record.get("model_type")),
-            "description": record.get("description", ""),
-            "availability": record.get("availability"),
+def get_model_diagnostics() -> dict[str, Any]:
+    if torch is None:
+        return {
+            "models": [],
+            "unavailable": [
+                {
+                    "model_type": "t2v_1.3B",
+                    "name": "Wan2.1 Text2video 1.3B",
+                    "description": "PyTorch is not installed",
+                    "availability": {"status": "missing", "status_code": 0, "available": False},
+                }
+            ],
+            "setup_command": "python scripts/download_model.py t2v_1.3B",
+            "error": "PyTorch is not installed",
         }
-        for record in records
-        if record.get("availability", {}).get("available", False)
-    ]
+    try:
+        session = get_session()
+        records = session.list_model_metadata(include_availability=True, main_output="video")
+        available_models = []
+        unavailable_models = []
+        
+        for record in records:
+            availability = record.get("availability", {})
+            item = {
+                "model_type": record.get("model_type"),
+                "name": record.get("name", record.get("model_type")),
+                "description": record.get("description", ""),
+                "availability": availability,
+            }
+            if availability.get("available", False):
+                available_models.append(item)
+            else:
+                unavailable_models.append(item)
+
+        return {
+            "models": available_models,
+            "unavailable": unavailable_models,
+            "setup_command": "python scripts/download_model.py t2v_1.3B",
+        }
+    except Exception as exc:
+        return {
+            "models": [],
+            "unavailable": [
+                {
+                    "model_type": "t2v_1.3B",
+                    "name": "Wan2.1 Text2video 1.3B",
+                    "description": str(exc),
+                    "availability": {"status": "missing", "status_code": 0, "available": False},
+                }
+            ],
+            "setup_command": "python scripts/download_model.py t2v_1.3B",
+            "error": str(exc),
+        }
+
+
+
+def model_records() -> list[dict[str, Any]]:
+    return get_model_diagnostics()["models"]
 
 
 def progress_callback(job_id: str):
@@ -201,7 +246,8 @@ def health():
 @app.get("/api/models")
 def models():
     try:
-        return {"models": model_records()}
+        diagnostics = get_model_diagnostics()
+        return diagnostics
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Model loading failed: {exc}") from exc
 
@@ -212,7 +258,35 @@ def generate(request: GenerationRequest):
         raise HTTPException(status_code=422, detail="Prompt cannot be blank")
     if generation_lock.locked():
         raise HTTPException(status_code=409, detail="A generation is already running")
+    
+    if torch is None:
+        raise HTTPException(
+            status_code=503,
+            detail="CUDA/GPU unavailable: PyTorch is not installed in this Python environment",
+        )
+
+    requested_model = request.model or "t2v_1.3B"
+    try:
+        session = get_session()
+        availability = session.get_model_availability(requested_model)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model loading failed: {exc}. Please run model setup: python scripts/download_model.py {requested_model}",
+        ) from exc
+
+    if not availability.get("available", False):
+        status_text = availability.get("status", "unavailable")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Model loading failed: Model '{requested_model}' is unavailable (status: {status_text}). "
+                f"Please run model setup on your terminal: python scripts/download_model.py {requested_model}"
+            ),
+        )
+
     job_id = uuid.uuid4().hex
+
     jobs[job_id] = {
         "id": job_id,
         "status": "QUEUED",

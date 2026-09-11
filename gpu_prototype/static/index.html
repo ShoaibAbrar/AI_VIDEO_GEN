@@ -47,8 +47,20 @@
       const response = await fetch('/api/models');
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Model loading failed');
-      $('model').replaceChildren(...data.models.map((model) => new Option(model.name, model.model_type)));
-      if (!data.models.length) throw new Error('No available video models found');
+      const models = data.models || [];
+      if (models.length > 0) {
+        $('model').replaceChildren(...models.map((model) => new Option(model.name, model.model_type)));
+      } else {
+        $('model').replaceChildren(new Option('No models available - run setup command', ''));
+        $('generate').disabled = true;
+        const cmd = data.setup_command || 'python scripts/download_model.py t2v_1.3B';
+        let unavailableInfo = '';
+        if (data.unavailable && data.unavailable.length) {
+          const t2v = data.unavailable.find(m => m.model_type === 't2v_1.3B') || data.unavailable[0];
+          unavailableInfo = `\nModel '${t2v.name}' status: ${t2v.availability ? t2v.availability.status : 'missing'}.`;
+        }
+        throw new Error(`No available video models found.${unavailableInfo}\n\nTo make t2v_1.3B available, run this command on your terminal:\n  ${cmd}`);
+      }
     }
     async function poll() {
       const response = await fetch(`/api/generate/${jobId}`);
