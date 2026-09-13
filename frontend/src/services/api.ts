@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || '/api/v1'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -31,6 +31,46 @@ apiClient.interceptors.request.use((config) => {
 
   return config
 })
+
+// Global response interceptor for session expiration (401)
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
+      originalRequest._retry = true
+
+      try {
+        const persisted = localStorage.getItem('auth-store')
+        if (persisted) {
+          const parsed = JSON.parse(persisted)
+          const refreshToken = parsed?.state?.refreshToken
+
+          if (refreshToken) {
+            const refreshRes = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+              refresh_token: refreshToken,
+            })
+
+            const newAccessToken = refreshRes.data.access_token
+            parsed.state.accessToken = newAccessToken
+            localStorage.setItem('auth-store', JSON.stringify(parsed))
+
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+            return apiClient(originalRequest)
+          }
+        }
+      } catch (refreshErr) {
+        localStorage.removeItem('auth-store')
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
 
 export const healthApi = {
   check: () => apiClient.get('/health'),

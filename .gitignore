@@ -101,3 +101,5 @@ loras_url_cache_v2.json
 # Keep the GPU prototype browser UI
 !gpu_prototype/static/
 !gpu_prototype/static/index.html
+
+test.db
