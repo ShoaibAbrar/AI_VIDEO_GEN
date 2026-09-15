@@ -1,227 +1,246 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useAuthStore } from '../store/authStore'
-import apiClient from '../services/api'
-import { GenerationJob } from '../types'
+import { useNavigate, Link } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
+import apiClient from '@/services/api'
+import { GenerationJob } from '@/types'
 import {
   Sparkles,
   Video,
+  History,
+  Shield,
+  Layers,
+  ArrowRight,
   Clock,
   CheckCircle2,
   AlertTriangle,
-  ArrowRight,
-  Shield,
-  History,
-  Cpu
+  Play
 } from 'lucide-react'
 
 export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate()
   const { user, isAdmin } = useAuthStore()
-  const [recentJobs, setRecentJobs] = useState<GenerationJob[]>([])
-  const [loadingJobs, setLoadingJobs] = useState(true)
+  const [jobs, setJobs] = useState<GenerationJob[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchJobs = async () => {
+    const fetchRecentJobs = async () => {
       try {
         const response = await apiClient.get('/generations')
-        setRecentJobs(response.data || [])
+        setJobs(response.data || [])
       } catch {
-        setRecentJobs([])
+        setJobs([])
       } finally {
-        setLoadingJobs(false)
+        setLoading(false)
       }
     }
-    fetchJobs()
+    fetchRecentJobs()
   }, [])
 
-  const totalCount = recentJobs.length
-  const completedCount = recentJobs.filter((j) => j.status === 'COMPLETED').length
-  const processingCount = recentJobs.filter((j) => j.status === 'PROCESSING' || j.status === 'QUEUED').length
-  const failedCount = recentJobs.filter((j) => j.status === 'FAILED').length
+  const completedCount = jobs.filter((j) => j.status === 'COMPLETED').length
+  const activeCount = jobs.filter((j) => j.status === 'PROCESSING' || j.status === 'QUEUED').length
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Hero Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-950/80 via-purple-950/50 to-slate-900 border border-indigo-800/40 p-8 sm:p-10 shadow-2xl backdrop-blur-xl">
-        <div className="relative z-10 max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-900/50 border border-indigo-700/60 rounded-full text-indigo-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>GenVid.AI Studio Workspace</span>
+    <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-indigo-950/80 via-purple-950/60 to-slate-900 border border-indigo-800/50 rounded-3xl p-6 sm:p-8 shadow-xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-900/60 border border-indigo-700/60 text-indigo-300 text-xs font-semibold">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Studio Workspace</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Welcome back, {user?.first_name || user?.username}!
+            </h1>
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+              Create and manage AI video renders with powerful multi-model generation engines.
+            </p>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Welcome back, {user?.first_name || user?.username}!
-          </h1>
-
-          <p className="text-slate-300 text-sm leading-relaxed">
-            Create, manage, and explore high-fidelity AI video generations powered by multi-model GPU inference.
-          </p>
-
-          <div className="pt-2 flex flex-wrap gap-3">
-            <Link
-              to="/dashboard/videos"
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl text-sm transition-all duration-200 shadow-lg shadow-indigo-600/25 flex items-center gap-2"
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => navigate('/dashboard/videos')}
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-indigo-600/25 flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Create New Video</span>
+              <span>Launch Video Studio</span>
               <ArrowRight className="w-4 h-4" />
-            </Link>
-
-            <Link
-              to="/history"
-              className="px-5 py-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-200 font-semibold rounded-xl text-sm transition flex items-center gap-2"
-            >
-              <History className="w-4 h-4 text-slate-400" />
-              <span>View History</span>
-            </Link>
-
-            {isAdmin() && (
-              <Link
-                to="/admin"
-                className="px-5 py-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-purple-300 font-semibold rounded-xl text-sm transition flex items-center gap-2"
-              >
-                <Shield className="w-4 h-4 text-purple-400" />
-                <span>Admin Panel</span>
-              </Link>
-            )}
+            </button>
           </div>
-        </div>
-
-        {/* Decorative Graphic Element */}
-        <div className="absolute right-[-40px] top-[-40px] w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      </div>
-
-      {/* Metrics & Statistics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Generations</span>
-            <Video className="w-4 h-4 text-indigo-400" />
-          </div>
-          <p className="text-3xl font-extrabold text-white">{totalCount}</p>
-        </div>
-
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Completed</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <p className="text-3xl font-extrabold text-emerald-400">{completedCount}</p>
-        </div>
-
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Processing / Queued</span>
-            <Clock className="w-4 h-4 text-blue-400" />
-          </div>
-          <p className="text-3xl font-extrabold text-blue-400">{processingCount}</p>
-        </div>
-
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Failed</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
-          </div>
-          <p className="text-3xl font-extrabold text-slate-400">{failedCount}</p>
         </div>
       </div>
 
-      {/* Feature Action Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-slate-700 transition flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-bold text-white">AI Video Studio</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Launch the studio workspace to prompt multi-model AI engines, adjust inference steps, and render MP4 videos.
-            </p>
-          </div>
-          <Link
-            to="/dashboard/videos"
-            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-indigo-600 border border-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl text-xs transition text-center block"
-          >
-            Open Studio Workspace &rarr;
-          </Link>
-        </div>
-
-        <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-4 hover:border-slate-700 transition flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-800/60 flex items-center justify-center text-purple-400">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <h3 className="text-lg font-bold text-white">Engine & Dynamic Discovery</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              GenVid.AI connects directly to the underlying Wan2GP engine to query model availability and GPU hardware status.
-            </p>
-          </div>
-          <Link
-            to="/profile"
-            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-purple-600 border border-slate-700 text-slate-200 hover:text-white font-semibold rounded-xl text-xs transition text-center block"
-          >
-            View Account & Permissions &rarr;
-          </Link>
-        </div>
-      </div>
-
-      {/* Recent Generations Showcase */}
-      <div className="bg-slate-900/90 rounded-2xl p-6 sm:p-8 border border-slate-800/90 shadow-xl space-y-6">
-        <div className="flex items-center justify-between">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center justify-between shadow-sm">
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">Recent Generations</h2>
-            <p className="text-slate-400 text-xs mt-0.5">Your latest video generation tasks</p>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Generations</p>
+            <p className="text-2xl font-bold text-white mt-1">{jobs.length}</p>
           </div>
-          <Link to="/history" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition">
-            View All History &rarr;
-          </Link>
+          <div className="w-11 h-11 rounded-xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
+            <Video className="w-5 h-5" />
+          </div>
         </div>
 
-        {loadingJobs ? (
-          <div className="text-center py-10 text-slate-400 text-xs animate-pulse">Loading recent video tasks...</div>
-        ) : recentJobs.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 space-y-3">
-            <p className="text-sm">No videos generated yet.</p>
-            <Link
-              to="/dashboard/videos"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs transition"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Create your first video</span>
-            </Link>
+        <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Completed Videos</p>
+            <p className="text-2xl font-bold text-emerald-400 mt-1">{completedCount}</p>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Queue</p>
+            <p className="text-2xl font-bold text-indigo-300 mt-1">{activeCount}</p>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-purple-950/80 border border-purple-800/60 flex items-center justify-center text-purple-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Navigation Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div
+          onClick={() => navigate('/dashboard/videos')}
+          className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-indigo-500/50 transition cursor-pointer group shadow-lg"
+        >
+          <div className="w-10 h-10 rounded-xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center text-indigo-400 mb-4 group-hover:scale-105 transition-transform">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+            <span>Video Studio</span>
+            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition" />
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Prompt, parameterize, and render AI videos using dynamically discovered inference models.
+          </p>
+        </div>
+
+        <div
+          onClick={() => navigate('/history')}
+          className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-indigo-500/50 transition cursor-pointer group shadow-lg"
+        >
+          <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-800/60 flex items-center justify-center text-purple-400 mb-4 group-hover:scale-105 transition-transform">
+            <History className="w-5 h-5" />
+          </div>
+          <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+            <span>Generation History</span>
+            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition" />
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Search, preview, and download your previous video creations and prompts.
+          </p>
+        </div>
+
+        {isAdmin() ? (
+          <div
+            onClick={() => navigate('/admin')}
+            className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-indigo-500/50 transition cursor-pointer group shadow-lg"
+          >
+            <div className="w-10 h-10 rounded-xl bg-pink-950/80 border border-pink-800/60 flex items-center justify-center text-pink-400 mb-4 group-hover:scale-105 transition-transform">
+              <Shield className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+              <span>Admin Center</span>
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 group-hover:translate-x-1 transition" />
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Manage platform users, roles, password resets, and inspect system health.
+            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {recentJobs.slice(0, 4).map((job) => (
-              <div
-                key={job.id}
-                className="p-4 bg-slate-800/50 border border-slate-800 hover:border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition"
-              >
-                <div className="space-y-1 min-w-0">
+          <div
+            onClick={() => navigate('/profile')}
+            className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-indigo-500/50 transition cursor-pointer group shadow-lg"
+          >
+            <div className="w-10 h-10 rounded-xl bg-pink-950/80 border border-pink-800/60 flex items-center justify-center text-pink-400 mb-4 group-hover:scale-105 transition-transform">
+              <Layers className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+              <span>Account & Roles</span>
+              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 group-hover:translate-x-1 transition" />
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Check your account status, assigned permissions, and platform settings.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Generations List */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white">Recent Activity</h2>
+            <p className="text-xs text-slate-400">Your latest video generation submissions</p>
+          </div>
+          <Link
+            to="/history"
+            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-slate-500 text-xs animate-pulse">Loading recent generations...</div>
+        ) : jobs.length === 0 ? (
+          <div className="py-12 text-center space-y-3 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800">
+            <Video className="w-8 h-8 text-slate-600 mx-auto" />
+            <p className="text-sm font-semibold text-slate-300">No video generations yet</p>
+            <p className="text-xs text-slate-500">Your generated videos will appear here once submitted.</p>
+            <button
+              onClick={() => navigate('/dashboard/videos')}
+              className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Create First Video</span>
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-800/80">
+            {jobs.slice(0, 5).map((job) => (
+              <div key={job.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white truncate">{job.prompt}</p>
-                  <div className="flex items-center gap-3 text-xs text-slate-400">
-                    <span className="font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-indigo-300">
-                      {job.model_type}
-                    </span>
-                    <span>•</span>
-                    <span>{new Date(job.created_at).toLocaleString()}</span>
-                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    <span className="text-slate-300 font-mono">{job.model_type}</span> · {new Date(job.created_at).toLocaleString()}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 ${
                       job.status === 'COMPLETED'
-                        ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                        ? 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
                         : job.status === 'PROCESSING'
-                        ? 'bg-blue-950/60 border-blue-800/60 text-blue-300 animate-pulse'
+                        ? 'bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 animate-pulse'
                         : job.status === 'FAILED'
-                        ? 'bg-rose-950/60 border-rose-800/60 text-rose-300'
-                        : 'bg-amber-950/60 border-amber-800/60 text-amber-300'
+                        ? 'bg-rose-950/60 border border-rose-800/60 text-rose-300'
+                        : 'bg-slate-800 text-slate-300'
                     }`}
                   >
-                    {job.status}
+                    {job.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                    {job.status === 'FAILED' && <AlertTriangle className="w-3 h-3 text-rose-400" />}
+                    <span>{job.status}</span>
+                    {job.progress !== null && job.status === 'PROCESSING' && <span>({job.progress}%)</span>}
                   </span>
+
+                  {job.status === 'COMPLETED' && job.output_available && (
+                    <button
+                      onClick={() => navigate('/history')}
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-lg transition"
+                      title="Play in History"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
