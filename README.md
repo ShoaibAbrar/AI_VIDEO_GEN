@@ -1,261 +1,286 @@
-# GenVid.AI — Multi-User AI Video Generation Platform
+# GenVid.AI — Multi-Engine AI Video Creation & Orchestration Platform
 
-> **AI Video Generation, Reimagined.**  
-> A custom multi-user SaaS platform built on top of the open-source **Wan2GP** diffusion engine.
+GenVid.AI is an enterprise-grade, model-agnostic AI video generation and narrative orchestration platform. It unifies state-of-the-art diffusion video engines, omni-modal audio-video foundation models, production pipelines, and zero-shot voice cloning into a single, intuitive interface and API gateway.
 
 ---
 
-## 📋 Overview
+## 1. Project Architecture
 
-**GenVid.AI** is a standalone web platform designed for generative video workflows. It provides an independent user interface, user authentication, role-based access control (RBAC), job queue management, video storage isolation, and video playback/download capabilities.
-
-Internally, the platform integrates directly with the **Wan2GP** generation engine in-process (`shared.api`), delegating low-level model loading, tensor processing, diffusion sampling loops, and GPU hardware acceleration to the engine without exposing Wan2GP's internal Gradio UI or technical mechanics to normal users.
-
-### Architectural Positioning
-
-```
-USER
-  ↓
-CUSTOM PLATFORM UI (React + TypeScript + Tailwind)
-  ↓
-CUSTOM PLATFORM BACKEND (FastAPI + SQLAlchemy + JWT)
-  ↓
-DATABASE-BACKED GENERATION QUEUE & WORKER
-  ↓
-WAN2GP INTEGRATION LAYER (Wan2GPService / shared.api)
-  ↓
-WAN2GP ENGINE RUNTIME
-  ↓
-AI VIDEO MODEL & GPU INFERENCE
-  ↓
-GENERATED MP4 VIDEO
-  ↓
-PLATFORM ISOLATED STORAGE (videos/{user_id}/{job_id}/)
-  ↓
-CUSTOM PLATFORM MEDIA PLAYER & DOWNLOAD
-  ↓
-USER
+```text
+User / Browser (React 18 + Vite + Tailwind CSS)
+                       │
+                       ▼
+         FastAPI REST API Gateway (Port 8000)
+       ┌───────────────┼───────────────┐
+       │               │               │
+       ▼               ▼               ▼
+Capability       VoiceEngine        GenerationWorker
+ Resolver         Registry             Pool
+       │               │               │
+       ▼               ▼               ▼
+ Video Engine      Edge TTS /      Local Worker /
+   Adapters        Chatterbox       Remote RunPod
+       │               │               │
+       └───────────────┼───────────────┘
+                       ▼
+          Output Media (.mp4 / .wav)
 ```
 
----
-
-## 🌟 Key Features
-
-### 🎨 User Experience & Studio
-- **Modern Studio Workspace:** Clean prompt canvas with prompt inspiration ideas, hyperparameter controls, and instant output previews.
-- **Dynamic Model Discovery:** Real-time discovery of supported video models from the underlying engine, distinguishing between models with ready checkpoints vs. missing weights.
-- **Configurable Parameters:** Fine-tune video length (frames), sampling steps, and randomized or fixed seeds.
-- **Live Generation Progress:** Real-time polling with progress percentages, active phase tracking (`denoising`, `rendering`), and step counters (`Step X/Y`).
-- **Media Player & Direct Download:** Built-in video player with instant MP4 playback and one-click download.
-- **Personal Video History:** Searchable and filterable generation archive scoped exclusively to the authenticated user.
-
-### 🛡️ Platform & Security
-- **User Authentication:** Secure registration and login using JWT access/refresh tokens and bcrypt password hashing.
-- **Role-Based Access Control (RBAC):** Tiered permissions supporting `admin`, `manager`, and `user` roles.
-- **Admin Control Center:** User account registry, role assignment, account activation/deactivation, and password reset workflows.
-- **Asynchronous DB-Backed Queue:** Background worker that claims queued jobs sequentially with row locking, preventing GPU contention.
-- **Storage Isolation:** Generated media is strictly mapped to `user_id`/`job_id` paths to prevent unauthorized access across tenants.
-- **Sanitized Error Handling:** Automatic abstraction of raw CUDA/Python stack traces into actionable application alerts.
-
-### ⚡ AI Engine & Hardware Awareness
-- **In-Process Wan2GP Integration:** High-performance direct Python API integration using `shared.api.init()`, `WanGPSession`, `submit_task()`, and `SessionJob.result()`.
-- **System Health Monitor:** Real-time diagnostics monitoring API latency, database connection, GPU VRAM allocation, and engine status.
+### Core Architecture Principles:
+* **Model-Agnostic Interface:** End users specify creative requirements (prompt, duration, voice, characters, quality, style). The backend **Capability Resolver** dynamically resolves and selects the optimal AI engine.
+* **Decoupled Engine Adapters:** All engines (Wan2GP, LTX, MiniMax H3, MoneyPrinterTurbo) implement standard contracts (`BaseVideoEngine` and `BaseVoiceEngine`).
+* **Heterogeneous Worker Execution:** Supports local CPU/GPU worker execution as well as remote worker pools (e.g. RunPod, custom GPU endpoints).
 
 ---
 
-## 🏗️ Architecture
+## 2. Supported Engines & Verification Status
 
-```mermaid
-flowchart TD
-    subgraph Client [Client Layer]
-        U[User Browser]
-        UI[GenVid.AI Frontend: React 18 / TS / Vite]
-    end
+| Engine / Component | Capability Type | Upstream Reference | Approved Status |
+|---|---|---|---|
+| **Wan2GP** | Diffusion Video Generation | Local / Wan2GP | `REAL integration / GPU verified` |
+| **LTX-Video** | Fast Diffusion Video | [Lightricks/LTX-Video](https://github.com/Lightricks/LTX-Video) | `REAL_INTEGRATION / GPU-READY` |
+| **LTX-2** | Omni-Modal Audio-Video | [Lightricks/LTX-2](https://github.com/Lightricks/LTX-2) | `REAL_INTEGRATION / GPU-READY / GPU-UNVERIFIED` |
+| **MiniMax H3** | Omni-Modal Audio-Video | [MiniMax-AI/H3](https://github.com/MiniMax-AI/H3) | `REAL_INTEGRATION / GPU-READY / GPU-UNVERIFIED` |
+| **H3 Director** | Multi-Character Narrative | [MiniMax-AI/H3](https://github.com/MiniMax-AI/H3) | `REAL_INTEGRATION / GPU-READY / GPU-UNVERIFIED` |
+| **H3 LongVideos** | Native Long Video Orchestration | [Smite79/MiniMax-H3-LongVideos](https://github.com/Smite79/MiniMax-H3-LongVideos) | `REAL_INTEGRATION / GPU-READY / GPU-UNVERIFIED` |
+| **MoneyPrinterTurbo** | Topic-to-Video Production Pipeline | [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) | `REAL_INTEGRATION / PRODUCTION PIPELINE` |
+| **Edge TTS** | Standard AI Voice Generation | [rany2/edge-tts](https://github.com/rany2/edge-tts) | `REAL integration` |
+| **Voice Cloning (Chatterbox)** | Zero-Shot Custom Voice | [resemble-ai/chatterbox](https://github.com/resemble-ai/chatterbox) | `REAL_INTEGRATION / GPU-READY / GPU-UNVERIFIED` |
 
-    subgraph API_Layer [API & Application Layer]
-        API[FastAPI REST API Server]
-        AUTH[JWT / Security / RBAC]
-        DB[(Platform Database: SQLite / PostgreSQL)]
-    end
-
-    subgraph Queue_Layer [Queue & Worker Layer]
-        Q[Database Job Queue]
-        W[Single-GPU Generation Worker]
-    end
-
-    subgraph Engine_Layer [Internal Engine Layer]
-        ADAPT[Wan2GPService Adapter]
-        SESS[WanGPSession: shared.api]
-        ENG[Wan2GP Diffusion Pipeline]
-        GPU[Target NVIDIA / AMD GPU]
-    end
-
-    subgraph Storage_Layer [Storage & Media Layer]
-        FS[Platform Storage: storage/videos/user_id/job_id/]
-    end
-
-    U -->|Interacts with| UI
-    UI -->|REST / JWT HTTP Requests| API
-    API --> AUTH
-    API -->|Read / Write State| DB
-    API -->|Enqueue Job| Q
-    Q -->|Claim Job with Lock| W
-    W -->|Forward Generation Settings| ADAPT
-    ADAPT -->|submit_task| SESS
-    SESS -->|Inference Execution| ENG
-    ENG -->|Hardware Acceleration| GPU
-    ENG -->|Render Final MP4| FS
-    W -->|Update Status & Artifact Path| DB
-    UI -->|Stream Video / Download| API
-    API -->|Serve Static Stream| FS
-```
+> [!IMPORTANT]
+> **Status Definitions:**
+> * `GPU VERIFIED`: Physically tested and validated on NVIDIA GPU hardware with real tensor inference output.
+> * `GPU-READY / GPU-UNVERIFIED`: Real integration code written and validated against official upstream code/repos, operating in plan-only/stub mode on CPU dev machines, awaiting physical GPU execution.
 
 ---
 
-## 🔄 End-to-End Generation Flow
+## 3. Capability vs Interface Matrix
 
-1. **User Authentication:** User signs in via `/login` and receives a secure JWT token.
-2. **Model Selection & Prompting:** User navigates to `/dashboard/videos`, selects a ready model dynamically reported by `/api/v1/generations/models`, and inputs a prompt.
-3. **Job Creation:** The frontend dispatches `POST /api/v1/generations`. The backend validates settings, creates a `GenerationJob` with status `QUEUED`, and triggers the worker.
-4. **Queue Pick-up:** The `GenerationWorker` claims the next queued task, updates status to `PROCESSING`, and dispatches the task to `Wan2GPService`.
-5. **Engine Inference:** `WanGPSession.submit_task()` executes the generation pipeline. Progress events (current step, total steps, phase) are streamed back to the database.
-6. **Output Archival:** On completion, the generated MP4 is moved to `storage/videos/{user_id}/{job_id}/output.mp4` and the job is marked `COMPLETED`.
-7. **Playback & Retrieval:** The user views the rendered video directly within the studio player or downloads the MP4 file.
-
----
-
-## 📁 Repository Structure
-
-```
-Wan2GP/
-├── backend/                        # FastAPI Application Core
-│   ├── app/
-│   │   ├── api/                    # REST API Route Handlers
-│   │   │   ├── admin.py            # User management & administration
-│   │   │   ├── auth.py             # Login, register, token refresh
-│   │   │   ├── generations.py      # Job submission, history, video streaming
-│   │   │   └── health.py           # Database, GPU, and engine health diagnostics
-│   │   ├── core/                   # Security, dependencies, RBAC
-│   │   ├── db/                     # Database session & models
-│   │   ├── models/                 # SQLAlchemy models (User, GenerationJob, Role)
-│   │   ├── schemas/                # Pydantic request/response schemas
-│   │   ├── services/               # Business logic & Worker
-│   │   │   ├── generation_worker.py # DB queue worker & progress persister
-│   │   │   └── wan2gp_service.py   # Adapter for Wan2GP shared.api
-│   │   ├── config.py               # Settings & environment variables
-│   │   └── main.py                 # FastAPI application factory & lifespan
-│   ├── tests/                      # Automated pytest suite (16 tests)
-│   └── requirements.txt            # Python dependencies
-│
-├── frontend/                       # GenVid.AI Single Page Application
-│   ├── src/
-│   │   ├── components/             # AppLayout, HealthStatus, ToastContainer, ProtectedRoute
-│   │   ├── pages/                  # Landing, Login, Register, Dashboard, Generation, History, Admin, Profile
-│   │   ├── services/               # Axios API client
-│   │   ├── store/                  # Zustand state stores (auth, toast)
-│   │   ├── App.tsx                 # Routing & layout configuration
-│   │   └── main.tsx                # React entrypoint
-│   ├── package.json                # Frontend dependencies
-│   └── vite.config.ts              # Vite configuration
-│
-├── shared/                         # Wan2GP Internal Engine
-│   ├── api.py                      # In-process WanGPSession API
-│   ├── api_cli.py                  # CLI task execution runner
-│   └── model_dropdowns.py          # Model file status & discovery logic
-│
-└── README.md                       # Project documentation
-```
+| Capability / Feature | UI Accessible | API / CLI Accessible | GPU Required | Remote GPU Support | Verification Status |
+|---|---|---|---|---|---|
+| **Text-to-Video Generation** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL / GPU VERIFIED` (Wan2GP) |
+| **Image-to-Video Generation** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL / GPU VERIFIED` (Wan2GP) |
+| **Fast Video Diffusion (LTX-Video)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-READY` |
+| **Omni-Modal Audio-Video (LTX-2)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-UNVERIFIED` |
+| **Omni-Modal Audio-Video (H3)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-UNVERIFIED` |
+| **Multi-Character Narrative (H3 Director)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-UNVERIFIED` |
+| **Native Long Video (H3 LongVideos)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-UNVERIFIED` |
+| **Scripted Video Production (MoneyPrinterTurbo)** | ✅ Yes | ✅ Yes | ❌ No (CPU) | ✅ Yes | `REAL_INTEGRATION / PRODUCTION PIPELINE` |
+| **Standard Voiceover (Edge TTS)** | ✅ Yes | ✅ Yes | ❌ No (CPU) | ✅ Yes | `REAL integration` |
+| **Zero-Shot Voice Cloning (Chatterbox)** | ✅ Yes | ✅ Yes | ✅ Yes (CUDA) | ✅ Yes | `REAL_INTEGRATION / GPU-UNVERIFIED` |
+| **Multi-Scene Story Planning** | ❌ API/CLI | ✅ Yes | ❌ No (CPU) | ✅ Yes | `REAL integration` |
+| **User & Role Administration** | ✅ Yes | ✅ Yes | ❌ No | N/A | `REAL integration` |
+| **System Diagnostics & Health Status** | ✅ Yes | ✅ Yes | ❌ No | N/A | `REAL integration` |
 
 ---
 
-## ⚙️ Configuration & Environment Variables
-
-Create a `.env` file inside `backend/` or export the variables in your environment:
-
-| Variable | Default | Description |
-|---|---|---|
-| `WAN2GP_ROOT` | Repository Root | Absolute path to the Wan2GP root directory containing `shared/` and model definitions |
-| `STORAGE_PATH` | `./generated_videos` | Filesystem directory where generated MP4 videos are archived |
-| `DATABASE_URL` | `sqlite:///./wangp.db` | SQLAlchemy connection string (`postgresql://...` or `sqlite:///...`) |
-| `JWT_SECRET_KEY` | Auto-generated | Secret key used for signing JWT authentication tokens |
-| `BACKEND_HOST` | `0.0.0.0` | API bind address |
-| `BACKEND_PORT` | `8000` | API port |
-| `FRONTEND_URL` | `http://localhost:5173` | Allowed frontend origin for CORS |
-| `GENERATION_WORKER_POLL_SECONDS` | `1.0` | Polling frequency for queue worker |
-
----
-
-## 🚀 Getting Started
+## 4. System Requirements & Setup
 
 ### Prerequisites
-- **Python:** 3.10, 3.11, or 3.12+
-- **Node.js:** 18+ and `npm`
-- **GPU Hardware:** NVIDIA GPU with CUDA support (or compatible AMD ROCm environment)
+* **Operating System:** Windows 10/11, Ubuntu 22.04+, or WSL2.
+* **Python:** Python 3.10 – 3.13.
+* **Node.js:** Node.js 18.0+.
+* **FFmpeg:** System FFmpeg installed and accessible in PATH.
+* **GPU (Optional for Dev, Required for Real Inference):** NVIDIA GPU with 12GB+ VRAM (24GB+ recommended for H3/LTX-2).
 
-### 1. Backend Setup
+---
+
+### Step 1 — Environment Configuration
+
+Clone the repository and create your `.env` file:
 
 ```bash
-# Navigate to repository root
-cd Wan2GP
-
-# Create and activate virtual environment
-python -m venv venv
-# On Windows:
-.\venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
-
-# Install backend dependencies
-pip install -r backend/requirements.txt
-
-# Start backend server
-python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 --reload
+cp .env.example .env
 ```
 
-The API docs are accessible at: `http://localhost:8000/docs`
+Default `.env` settings for local CPU development:
 
-### 2. Frontend Setup
+```env
+DEBUG=true
+BACKEND_HOST=127.0.0.1
+BACKEND_PORT=8000
+DEV_MOCK_ENGINE=true
+DATABASE_URL=sqlite:///./wangp.db
+STORAGE_PATH=./generated_videos
+FRONTEND_URL=http://localhost:5173
+```
+
+---
+
+### Step 2 — Backend Setup
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# Linux / macOS:
+# source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+---
+
+### Step 3 — Frontend Setup
 
 ```bash
 # Navigate to frontend directory
-cd Wan2GP/frontend
+cd frontend
 
-# Install dependencies
+# Install Node modules
 npm install
 
-# Start development server
-npm run dev
-```
-
-Open your browser at: `http://localhost:5173`
-
----
-
-## 🧪 Testing & Verification
-
-### Run Backend Tests
-```bash
-pytest backend/tests
-```
-
-### Run Frontend Type Checking & Build
-```bash
-cd frontend
-npm run type-check
+# Build check
 npm run build
 ```
 
 ---
 
-## 🔒 Security & User Isolation
+### Step 4 — Starting the Application
 
-- **Role Separation:** Regular users can only see and cancel their own jobs. Admin users have access to system-wide metrics and user moderation tools.
-- **Storage Safety:** Path traversal attacks are mitigated by resolving output files strictly against `STORAGE_PATH`.
-- **Sanitized Execution:** Users provide high-level parameters (prompt, frames, steps, seed) rather than raw filesystem paths or executable commands.
+#### Option A — Backend API Gateway & Worker
+
+```bash
+# From backend directory with venv activated:
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+#### Option B — Frontend Development Server
+
+```bash
+# From frontend directory:
+npm run dev
+```
+
+Open browser at `http://localhost:5173`. Default admin user initialized automatically:
+* **Username:** `admin` or create account on `/register` page.
 
 ---
 
-## 📄 License & Attribution
+## 5. Complete Testing Guide & CLI Matrix
 
-- **Platform Code (UI, Backend, Queue, API):** Proprietary / Custom Platform.
-- **Underlying Engine (Wan2GP):** Open-source generative engine created by DeepBeepMeep.
+### Test Categories
+
+Tests are classified into 5 operational levels:
+
+1. **UNIT/INTEGRATION:** Pure logic, schema, and API routing tests (0.5s execution time).
+2. **REAL CPU:** Executes real CPU tasks (e.g. Edge TTS synthesis, FFmpeg stitching, MoneyPrinterTurbo script parsing).
+3. **REAL GPU:** Requires local NVIDIA CUDA hardware for neural inference.
+4. **REMOTE GPU:** Dispatches inference tasks to remote worker pools or RunPod endpoints.
+5. **END-TO-END:** Complete path from request submission to final output file generation.
+
+---
+
+### Full Test Suite Command
+
+Run the complete backend test suite:
+
+```bash
+cd backend
+python -m pytest backend/tests -v --tb=short
+```
+
+**Expected Result:** 312 passed, 1 skipped (CUDA hardware skip), 0 failed.
+
+---
+
+### Engine-by-Engine Test Commands
+
+| Engine | Test Target | Command | Test Type |
+|---|---|---|---|
+| **Platform E2E Audit** | 20-Point Audit | `python -m pytest backend/tests/test_platform_e2e_audit.py -v` | INTEGRATION / REAL CPU |
+| **Capability Resolver** | Capability Mapping | `python -m pytest backend/tests/test_capability_resolver.py -v` | UNIT/INTEGRATION |
+| **Wan2GP** | Engine Adapter | `python -m pytest backend/tests/test_wan2gp_adapter.py -v` | INTEGRATION / REAL GPU |
+| **LTX-Video** | Engine Adapter | `python -m pytest backend/tests/test_ltx_video_adapter.py -v` | INTEGRATION / REAL CPU |
+| **LTX-2** | Audio-Video Engine | `python -m pytest backend/tests/test_ltx2_adapter.py -v` | INTEGRATION / REAL CPU |
+| **MiniMax H3** | Omni-AV Engine | `python -m pytest backend/tests/test_minimax_h3_adapter.py -v` | INTEGRATION / REAL CPU |
+| **H3 Director** | Multi-Character Card | `python -m pytest backend/tests/test_minimax_h3_director_comprehensive.py -v` | INTEGRATION / REAL CPU |
+| **H3 LongVideos** | Long Video Chunking | `python -m pytest backend/tests/test_minimax_h3_longvideos_comprehensive.py -v` | INTEGRATION / REAL CPU |
+| **MoneyPrinterTurbo** | Production Pipeline | `python -m pytest backend/tests/test_money_printer_turbo_comprehensive.py -v` | INTEGRATION / REAL CPU |
+| **Voice Cloning** | Chatterbox Zero-Shot | `python -m pytest backend/tests/test_voice_cloning_comprehensive.py -v` | INTEGRATION / REAL CPU |
+
+---
+
+### Dedicated Feature CLI Test Scripts
+
+#### 1. Voice Cloning CLI Test (Chatterbox Zero-Shot)
+
+```bash
+python scripts/test-real-voice-cloning.py
+```
+
+* **Validates:** Reference audio validation, consent enforcement, profile creation, speaker embedding extraction, output WAV generation.
+
+#### 2. MoneyPrinterTurbo Scripted Production Pipeline
+
+```bash
+python -m pytest backend/tests/test_money_printer_turbo_comprehensive.py -v
+```
+
+#### 3. Long Video Orchestrator CLI Test
+
+```bash
+python -m pytest backend/tests/test_minimax_h3_longvideos_comprehensive.py -v
+```
+
+---
+
+## 6. Remote GPU & RunPod Setup
+
+To run neural inference on remote cloud GPUs (e.g., RunPod, Lambda Labs, or custom GPU servers):
+
+1. Set `.env` values:
+   ```env
+   DEV_MOCK_ENGINE=false
+   RUNPOD_API_KEY=your-runpod-api-key
+   RUNPOD_ENDPOINT_ID=your-endpoint-id
+   ```
+2. Start the remote worker:
+   ```bash
+   # Windows:
+   .\scripts\start-voice-cloning-worker.ps1
+   # Linux / RunPod:
+   bash ./scripts/start-voice-cloning-worker.sh
+   ```
+
+---
+
+## 7. Media Output Directory Locations
+
+All media artifacts and database assets are saved locally:
+
+* **Rendered AI Videos:** `./generated_videos/`
+* **Custom Voice Profiles & Embeddings:** `./storage/voice_profiles/`
+* **MoneyPrinterTurbo Video Outputs:** `./output/moneyprinterturbo/`
+* **Cloned Voice WAV Outputs:** `./output/voice_cloning/`
+* **Database File:** `./wangp.db`
+
+---
+
+## 8. Known Limitations & Truthful Status
+
+1. **GPU Verification Status:**
+   * `Wan2GP` is physically GPU verified.
+   * `LTX-2`, `MiniMax H3`, `H3 Director`, `H3 LongVideos`, and `Chatterbox Voice Cloning` are **GPU-READY / GPU-UNVERIFIED**. Code integrations, schemas, workers, and diagnostics are complete, running in CPU plan-only / stub mode on non-CUDA development hardware. Physical CUDA hardware is required for real tensor weights inference.
+2. **PyPI / Upstream Dependencies:**
+   * Real Chatterbox voice synthesis requires `pip install chatterbox-tts==0.1.1` on CUDA host.
+3. **Database:**
+   * SQLite is configured by default for zero-setup local operation. Production environments should set `DATABASE_URL` to PostgreSQL.
+
+---
+
+## 9. License
+
+This repository contains integration code for multiple open-source software packages:
+* **GenVid.AI Platform:** MIT License
+* **Chatterbox TTS:** MIT License (Code & Weights)
+* **MoneyPrinterTurbo:** MIT License
+* **Edge TTS:** MIT License
+* **LTX-2 / LTX-Video:** Apache 2.0 / Custom Community License

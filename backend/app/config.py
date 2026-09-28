@@ -20,6 +20,7 @@ class Settings:
     APP_NAME: str = "Wan2GP Platform"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+    DEV_MOCK_ENGINE: bool = os.getenv("DEV_MOCK_ENGINE", "false").lower() in ("true", "1", "yes")
     
     # API
     API_V1_PREFIX: str = "/api/v1"

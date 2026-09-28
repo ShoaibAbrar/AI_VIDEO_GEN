@@ -79,3 +79,59 @@ export interface ToastMessage {
   title: string
   message?: string
 }
+
+export type DurationMode = 'short' | 'long' | 'custom'
+export type VoiceMode = 'none' | 'ai' | 'human_like' | 'custom_user_voice'
+export type CharacterMode = 'single' | 'multiple'
+export type ContinuityLevel = 'standard' | 'high' | 'maximum'
+export type QualityTier = 'standard' | 'high' | 'cinematic'
+export type GenerationStyle =
+  | 'cinematic'
+  | 'realistic'
+  | 'anime'
+  | '3d_animation'
+  | 'fantasy'
+  | 'cyberpunk'
+  | 'documentary'
+  | 'custom'
+
+export interface UserRequirements {
+  prompt: string
+  duration: DurationMode
+  custom_seconds?: number | null
+  voice_mode: VoiceMode
+  audio_prompt?: string | null
+  character_mode: CharacterMode
+  continuity: ContinuityLevel
+  quality: QualityTier
+  generation_style: GenerationStyle
+  aspect_ratio: string
+  seed: number
+  reference_image_url?: string | null
+  reference_audio_url?: string | null
+}
+
+export interface EngineEvaluation {
+  engine_id: string
+  display_name: string
+  available: boolean
+  is_compatible: boolean
+  matched_capabilities: string[]
+  missing_capabilities: string[]
+  score: number
+  notes: string
+}
+
+export interface GenerationPlan {
+  requirements: UserRequirements
+  requested_capabilities: Record<string, boolean>
+  selected_engine_id: string | null
+  selected_engine_name: string | null
+  selected_model_type: string | null
+  satisfies_all: boolean
+  reason: string
+  unsupported_requirements: string[]
+  fallback_options: EngineEvaluation[]
+  normalized_settings: Record<string, any>
+}
+

@@ -103,3 +103,6 @@ loras_url_cache_v2.json
 !gpu_prototype/static/index.html
 
 test.db
+
+output/
+generated_videos/

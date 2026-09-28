@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.logging_config import logger
 from app.db.database import get_db
+from app.engines.registry import get_engine_registry
 from app.services.wan2gp_service import Wan2GPService
 
 router = APIRouter(tags=["health"])
@@ -52,7 +53,7 @@ def _get_gpu_info() -> dict[str, Any]:
 async def health_check(db: Session = Depends(get_db)):
     """
     Health check endpoint.
-    Returns application, database, GPU, and Wan2GP runtime status.
+    Returns application, database, GPU, and engine runtime status.
     """
     try:
         db.execute(text("SELECT 1"))
@@ -62,7 +63,9 @@ async def health_check(db: Session = Depends(get_db)):
         db_status = "unhealthy"
 
     gpu_info = _get_gpu_info()
-    wan2gp_info = _wan2gp_service.get_runtime_status()
+    engine_registry = get_engine_registry()
+    engines_info = engine_registry.get_runtime_status()
+    wan2gp_info = engines_info.get("engines", {}).get("wan2gp") or _wan2gp_service.get_runtime_status()
 
     is_overall_healthy = db_status == "healthy"
 
@@ -72,4 +75,5 @@ async def health_check(db: Session = Depends(get_db)):
         "database": db_status,
         "gpu": gpu_info,
         "wan2gp": wan2gp_info,
+        "engines": engines_info,
     }

@@ -10,7 +10,7 @@ from app.config import settings
 from app.core.logging_config import logger
 from app.core.exceptions import AppException
 from app.db.database import init_db, SessionLocal
-from app.api import health, auth, admin, generations
+from app.api import health, auth, admin, generations, long_video, voices
 from app.api.generations import generation_worker
 from app.models.user import Role
 
@@ -89,6 +89,8 @@ app.include_router(health.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(generations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(long_video.router, prefix=settings.API_V1_PREFIX)
+app.include_router(voices.router, prefix=settings.API_V1_PREFIX)
 
 
 # Root endpoint
